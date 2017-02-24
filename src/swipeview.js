@@ -1,6 +1,7 @@
 /*!
  * SwipeView v1.0 ~ Copyright (c) 2012 Matteo Spinelli, http://cubiq.org
  * Released under MIT license, http://cubiq.org/license
+ * ozzy modify for startPageIndex setting 2017/02/24
  */
 var SwipeView = (function (window, document) {
 	var dummyStyle = document.createElement('div').style,
@@ -66,7 +67,10 @@ var SwipeView = (function (window, document) {
 				numberOfPages: 3,
 				snapThreshold: null,
 				hastyPageFlip: false,
-				loop: true
+				loop: true,
+				numberOfDiv:3,
+				autoCreateDiv:true, //自動生成 slider與masterPage div,預設是true
+				startPageIndex:0 //預設初始顯示的頁面index
 			};
 		
 			// User defined options
@@ -76,41 +80,74 @@ var SwipeView = (function (window, document) {
 			this.wrapper.style.position = 'relative';
 			
 			this.masterPages = [];
-			
-			div = document.createElement('div');
-			div.id = 'swipeview-slider';
-			div.style.cssText = 'position:relative;top:0;height:100%;width:100%;' + cssVendor + 'transition-duration:0;' + cssVendor + 'transform:translateZ(0);' + cssVendor + 'transition-timing-function:ease-out';
-			this.wrapper.appendChild(div);
-			this.slider = div;
-
-			this.refreshSize();
-
-			for (i=-1; i<2; i++) {
+			if(this.options.autoCreateDiv){
 				div = document.createElement('div');
-				div.id = 'swipeview-masterpage-' + (i+1);
-				div.style.cssText = cssVendor + 'transform:translateZ(0);position:absolute;top:0;height:100%;width:100%;left:' + i*100 + '%';
-				if (!div.dataset) div.dataset = {};
-				pageIndex = i == -1 ? this.options.numberOfPages - 1 : i;
-				div.dataset.pageIndex = pageIndex;
-				div.dataset.upcomingPageIndex = pageIndex;
+				div.id = 'swipeview-slider';
+				div.style.cssText = 'position:relative;top:0;height:100%;width:100%;' + cssVendor + 'transition-duration:0;' + cssVendor + 'transform:translateZ(0);' + cssVendor + 'transition-timing-function:ease-out';
 				
-				if (!this.options.loop && i == -1) div.style.visibility = 'hidden';
+				this.wrapper.appendChild(div);
+				this.slider = div;
 
-				this.slider.appendChild(div);
-				this.masterPages.push(div);
+				this.refreshSize();
+				
+				for (i=-1; i<2; i++) {
+					div = document.createElement('div');
+					div.id = 'swipeview-masterpage-' + (i+1);
+					div.style.cssText = cssVendor + 'transform:translateZ(0);position:absolute;top:0;height:100%;width:100%;left:' + i*100 + '%';
+					
+					if (!div.dataset) div.dataset = {};
+					//pageIndex = i == -1 ? this.options.numberOfPages - 1 : i;
+					if(i==-1){
+						//master page 0
+						pageIndex = this.options.startPageIndex-1<0?this.options.numberOfPages-1:this.options.startPageIndex-1
+					}else if(i==0){
+						//master page 1
+						pageIndex = this.options.startPageIndex
+					}else if(i==1){
+						//master page 2
+						pageIndex = this.options.startPageIndex+1>this.options.numberOfPages-1?this.options.numberOfPages-1:this.options.startPageIndex+1
+					}
+					div.dataset.pageIndex = pageIndex;
+					div.dataset.upcomingPageIndex = pageIndex;
+					//disbale by ozzy
+					//if (!this.options.loop && i == -1) div.style.visibility = 'hidden';
+
+					this.slider.appendChild(div);
+					this.masterPages.push(div);
+				}
+			}else{
+				// oz modify 對已存在的html加入 swipe
+				this.slider = document.querySelector('#swipeview-slider');
+				this.refreshSize();
+				for (i=-1; i<2; i++) {
+					div = document.querySelector("#swipeview-masterpage-"+(i+1));
+					if (!div.dataset) div.dataset = {};
+					// 會讓page index 初始會是 lenngth-1,0,1
+					pageIndex = i == -1 ? this.options.numberOfPages - 1 : i;
+					div.dataset.pageIndex = pageIndex;
+					div.dataset.upcomingPageIndex = pageIndex;
+					this.masterPages.push(div);
+				}
 			}
 			
 			className = this.masterPages[1].className;
 			this.masterPages[1].className = !className ? 'swipeview-active' : className + ' swipeview-active';
 
 			window.addEventListener(resizeEvent, this, false);
-			this.wrapper.addEventListener(startEvent, this, false);
+			this.wrapper.addEventListener(startEvent, this, true);
 			this.wrapper.addEventListener(moveEvent, this, false);
 			this.wrapper.addEventListener(endEvent, this, false);
 			this.slider.addEventListener(transitionEndEvent, this, false);
 			// in Opera >= 12 the transitionend event is lowercase so we register both events
 			if ( vendor == 'O' ) this.slider.addEventListener(transitionEndEvent.toLowerCase(), this, false);
-
+			// 當預設由非第一頁進入 需做delay 才會避免頁面不顯示問題
+			if(this.options.startPageIndex !=0){
+				setTimeout(function(){
+					this.goToPage(this.options.startPageIndex)
+				},300)
+				
+			}
+				 
 /*			if (!hasTouch) {
 				this.wrapper.addEventListener('mouseout', this, false);
 			}*/
@@ -139,7 +176,7 @@ var SwipeView = (function (window, document) {
 		},
 		
 		onTouchStart: function (fn) {
-			this.wrapper.addEventListener('swipeview-touchstart', fn, false);
+			this.wrapper.addEventListener('swipeview-touchstart', fn,false);
 			this.customEvents.push(['touchstart', fn]);
 		},
 
@@ -180,7 +217,7 @@ var SwipeView = (function (window, document) {
 		
 		goToPage: function (p) {
 			var i;
-
+			//oz modify for this 
 			this.masterPages[this.currentMasterPage].className = this.masterPages[this.currentMasterPage].className.replace(/(^|\s)swipeview-active(\s|$)/, '');
 			for (i=0; i<3; i++) {
 				className = this.masterPages[i].className;
@@ -196,7 +233,29 @@ var SwipeView = (function (window, document) {
 			this.currentMasterPage = (this.page + 1) - Math.floor((this.page + 1) / 3) * 3;
 
 			this.masterPages[this.currentMasterPage].className = this.masterPages[this.currentMasterPage].className + ' swipeview-active';
+			
+			//now is this.currentMasterPage will goto this.page
+			//--oz modify---
+			//*
+			for(var i=0;i<3;i++){
+				if(i>this.currentMasterPage){
 
+				}else if(i===this.currentMasterPage){
+					this.masterPages[i].style.left = this.page * 100 + '%';
+				}else if(i<this.currentMasterPage){
+
+				} 
+				this.masterPages[2].style.left = this.page * 100 - 100 + '%';
+				
+				this.masterPages[1].style.left = this.page * 100 + 100 + '%';
+				
+				this.masterPages[2].dataset.upcomingPageIndex = this.page === 0 ? this.options.numberOfPages-1 : this.page - 1;
+				this.masterPages[0].dataset.upcomingPageIndex = this.page;
+				this.masterPages[1].dataset.upcomingPageIndex = this.page == this.options.numberOfPages-1 ? 0 : this.page + 1;
+				
+			}
+			//*/
+			/*			
 			if (this.currentMasterPage === 0) {
 				this.masterPages[2].style.left = this.page * 100 - 100 + '%';
 				this.masterPages[0].style.left = this.page * 100 + '%';
@@ -222,7 +281,10 @@ var SwipeView = (function (window, document) {
 				this.masterPages[2].dataset.upcomingPageIndex = this.page;
 				this.masterPages[0].dataset.upcomingPageIndex = this.page == this.options.numberOfPages-1 ? 0 : this.page + 1;
 			}
-			
+			*/
+			//.log("master 0 upcom="+this.masterPages[0].dataset.upcomingPageIndex)
+			//console.log("master 1 upcom="+this.masterPages[1].dataset.upcomingPageIndex)
+			//console.log("master 2 upcom="+this.masterPages[2].dataset.upcomingPageIndex)
 			this.__flip();
 		},
 		
@@ -245,7 +307,14 @@ var SwipeView = (function (window, document) {
 		handleEvent: function (e) {
 			switch (e.type) {
 				case startEvent:
-					this.__start(e);
+					// oz add 只要有上層元素有設定data-allow-swipe=false 則不觸發swipe,需改成不相依jquery
+					//console.log($(e.target).closest("div[data-allow-swipe-view=false]"))
+					if($(e.target).closest("div[data-allow-swipe-view=false]").length===0){
+					//if(e.target.closest("div[data-allow-swipe=false]")===null){
+						this.__start(e);
+					}
+					
+
 					break;
 				case moveEvent:
 					this.__move(e);
@@ -390,9 +459,10 @@ var SwipeView = (function (window, document) {
 				className;
 
 			this.masterPages[this.currentMasterPage].className = this.masterPages[this.currentMasterPage].className.replace(/(^|\s)swipeview-active(\s|$)/, '');
-
+			
 			// Flip the page
 			if (this.directionX > 0) {
+				// 向右邊 swipe
 				this.page = -Math.ceil(this.x / this.pageWidth);
 				this.currentMasterPage = (this.page + 1) - Math.floor((this.page + 1) / 3) * 3;
 				this.pageIndex = this.pageIndex === 0 ? this.options.numberOfPages - 1 : this.pageIndex - 1;
@@ -403,6 +473,7 @@ var SwipeView = (function (window, document) {
 
 				pageFlipIndex = this.page - 1;
 			} else {
+				// console.log("向左 swipe <<<")
 				this.page = -Math.floor(this.x / this.pageWidth);
 				this.currentMasterPage = (this.page + 1) - Math.floor((this.page + 1) / 3) * 3;
 				this.pageIndex = this.pageIndex == this.options.numberOfPages - 1 ? 0 : this.pageIndex + 1;
@@ -413,7 +484,7 @@ var SwipeView = (function (window, document) {
 
 				pageFlipIndex = this.page + 1;
 			}
-
+			//console.log("after pageFlipIndex="+pageFlipIndex)
 			// Add active class to current page
 			className = this.masterPages[this.currentMasterPage].className;
 			/(^|\s)swipeview-active(\s|$)/.test(className) || (this.masterPages[this.currentMasterPage].className = !className ? 'swipeview-active' : className + ' swipeview-active');
@@ -424,7 +495,7 @@ var SwipeView = (function (window, document) {
 			
 			pageFlipIndex = pageFlipIndex - Math.floor(pageFlipIndex / this.options.numberOfPages) * this.options.numberOfPages;
 			this.masterPages[pageFlip].dataset.upcomingPageIndex = pageFlipIndex;		// Index to be loaded in the newly flipped page
-
+			//console.log("["+pageFlip+"] upcom="+this.masterPages[pageFlip].dataset.upcomingPageIndex)
 			newX = -this.page * this.pageWidth;
 			
 			this.slider.style[transitionDuration] = Math.floor(500 * Math.abs(this.x - newX) / this.pageWidth) + 'ms';
